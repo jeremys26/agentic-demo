@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "agent360": {
+      "url": "http://localhost:8100/mcp"
+    }
+  }
+}

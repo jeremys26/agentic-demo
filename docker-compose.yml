@@ -1,0 +1,239 @@
+# One Postgres server, 5 logical databases (one per standalone service, plus
+# the MCP server's own) — per PLANNING.md §5/§13. The 4 sim services are
+# fully independent: own process, own database, HTTP-only communication —
+# that separation is what makes the "connected disconnected systems" claim
+# real rather than four modules sharing one app.
+x-django-start: &django-start
+  sh -c "python manage.py migrate && python manage.py seed_data && python manage.py runserver 0.0.0.0:8000"
+
+x-service-auth: &service-auth
+  SERVICE_TOKEN: agent360-service
+  JWT_SIGNING_KEY: agent360-jwt-dev
+
+x-django-health: &django-health
+  interval: 5s
+  timeout: 5s
+  retries: 12
+  start_period: 45s
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: agent360
+      POSTGRES_PASSWORD: agent360
+      POSTGRES_DB: onesource360
+    ports:
+      - "5433:5432"  # host 5433 avoids clashing with any local Postgres already on 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent360"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  onesource360:
+    build: ./services/onesource360
+    command: *django-start
+    environment:
+      DB_HOST: postgres
+      DB_NAME: onesource360
+      DB_USER: agent360
+      DB_PASSWORD: agent360
+      <<: *service-auth
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *django-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/')"]
+
+  smartspot360:
+    build: ./services/smartspot360
+    command: *django-start
+    environment:
+      DB_HOST: postgres
+      DB_NAME: smartspot360
+      DB_USER: agent360
+      DB_PASSWORD: agent360
+      <<: *service-auth
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *django-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/')"]
+
+  captivator360:
+    build: ./services/captivator360
+    command: *django-start
+    environment:
+      DB_HOST: postgres
+      DB_NAME: captivator360
+      DB_USER: agent360
+      DB_PASSWORD: agent360
+      <<: *service-auth
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *django-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/')"]
+
+  maestro360:
+    build: ./services/maestro360
+    command: *django-start
+    environment:
+      DB_HOST: postgres
+      DB_NAME: maestro360
+      DB_USER: agent360
+      DB_PASSWORD: agent360
+      <<: *service-auth
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *django-health
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/')"]
+
+  # PLANNING.md §14 phase 10 — a newly-acquired platform's own service,
+  # already live the whole time; deliberately not yet wired into the
+  # agent's tool registry (see mcp_server/tools/rankpulse.py and the
+  # commented-out import in mcp_server/main.py). Standalone FastAPI, no DB,
+  # no Postgres dependency — an acquisition brings its own stack, not
+  # BMG360's Django-based tooling.
+  rankpulse:
+    build: ./services/rankpulse_sim
+    ports:
+      - "8005:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  mcp_server:
+    build: ./mcp_server
+    environment:
+      ONESOURCE360_URL: http://onesource360:8000
+      SMARTSPOT360_URL: http://smartspot360:8000
+      CAPTIVATOR360_URL: http://captivator360:8000
+      MAESTRO360_URL: http://maestro360:8000
+      RANKPULSE_URL: http://rankpulse:8000
+      DB_HOST: postgres
+      DB_NAME: mcp_server
+      DB_USER: agent360
+      DB_PASSWORD: agent360
+      SERVICE_TOKEN: agent360-service
+    ports:
+      - "8100:8100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      onesource360:
+        condition: service_healthy
+      smartspot360:
+        condition: service_healthy
+      captivator360:
+        condition: service_healthy
+      maestro360:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"  # host 6380 avoids clashing with any local Redis already on 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Tier 2 anomaly sweep (PLANNING.md §8): Celery worker + beat, hosted
+  # alongside the MCP server (same image, same guardrails/engine.py code),
+  # not as a separate unowned component. beat only schedules; worker is what
+  # actually calls run_anomaly_sweep(), so only worker needs the sim
+  # services' URLs and the mcp_server DB credentials.
+  celery_worker:
+    build: ./mcp_server
+    command: celery -A celery_app worker --loglevel=info
+    environment:
+      ONESOURCE360_URL: http://onesource360:8000
+      SMARTSPOT360_URL: http://smartspot360:8000
+      CAPTIVATOR360_URL: http://captivator360:8000
+      MAESTRO360_URL: http://maestro360:8000
+      DB_HOST: postgres
+      DB_NAME: mcp_server
+      DB_USER: agent360
+      DB_PASSWORD: agent360
+      REDIS_URL: redis://redis:6379/0
+      SERVICE_TOKEN: agent360-service
+      PYTHONPATH: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mcp_server:
+        condition: service_healthy
+
+  celery_beat:
+    build: ./mcp_server
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      ANOMALY_SWEEP_INTERVAL_SECONDS: "300"
+    depends_on:
+      redis:
+        condition: service_healthy
+      celery_worker:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    environment:
+      # Resolved in the browser (on the host), not inside this container —
+      # the dev server just serves JS; fetch() calls go straight to the
+      # published host ports, same as if you ran `npm run dev` locally.
+      VITE_ONESOURCE360_URL: http://localhost:8001
+      VITE_SMARTSPOT360_URL: http://localhost:8002
+      VITE_CAPTIVATOR360_URL: http://localhost:8003
+      VITE_MAESTRO360_URL: http://localhost:8004
+      VITE_RANKPULSE_URL: http://localhost:8005
+      VITE_MCP_SERVER_URL: http://localhost:8100
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+    depends_on:
+      onesource360:
+        condition: service_healthy
+      smartspot360:
+        condition: service_healthy
+      captivator360:
+        condition: service_healthy
+      maestro360:
+        condition: service_healthy
+      mcp_server:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
