@@ -138,8 +138,8 @@ export const AgentActionList = () => (
       terms={[
         { term: "Executed (auto)", def: "A small, low-risk change that ran immediately. Logged with a pre-action snapshot for audit." },
         { term: "Pending Approval", def: "Waiting on you. Nothing happens until you Approve or Reject." },
-        { term: "Blocked", def: "Refused outright because it would cross a hard safety limit." },
-        { term: "Risk", def: "0–100. Below 30 can auto-run; 30–70 waits for you; 70+ is blocked. “Hard cap” means a safety ceiling held it for review even if the score looks low." },
+        { term: "Blocked", def: "Refused outright because it would cross a hard cap." },
+        { term: "Risk", def: "0–100. Below 30 runs automatically; 30–70 waits for your approval; 70+ is blocked. A “hard cap” can still hold a low score for review." },
       ]}
     />
     <List

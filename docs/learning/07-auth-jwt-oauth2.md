@@ -7,13 +7,13 @@
 Two different identities need to call these APIs:
 
 1. **A person** — logging into a Django API to browse or mutate data. That's a **JWT** (JSON Web Token): the server checks username/password once, then hands back a signed token the client sends on later requests. This repo uses `djangorestframework-simplejwt` for that — `POST /api/token/` with `{"username":"demo","password":"demo"}` returns an access token.
-2. **A machine** — the MCP server calling the four sim services on every tool call. That's a **client-credentials-style service token**: a shared secret the MCP server holds (`SERVICE_TOKEN`) and sends as `X-Service-Token`. It is *not* a full OAuth2 authorization server (the Decisions Log explicitly skipped that); it's the same pattern with proportionate machinery.
+2. **A machine** — the MCP server calling the four sim services on every tool call. That's a **client-credentials-style service token**: a shared secret the MCP server holds (`SERVICE_TOKEN`) and sends as `X-Service-Token`.
 
 They are deliberately different headers. simplejwt looks at `Authorization: Bearer <jwt>` and **raises** if that value isn't a JWT. A service token in `Authorization` would 401 every MCP call. `X-Service-Token` keeps the two authenticators from colliding.
 
 ## Why this piece of the stack is used here
 
-`PLANNING.md` §7 puts governance at the gateway, but the four Django services still shouldn't accept unauthenticated writes. Webhooks ("Simulate Next Day") and mutations (`POST /api/recommendations/`, creative refresh) require either a valid JWT or the service token. **GET stays `AllowAny`** so the local React-Admin console and Docker healthchecks don't need a login wall — this is a standup demo, not a production lockdown. Tightening reads to `IsAuthenticated` is a one-line permission change once you want that.
+`PLANNING.md` §7 puts governance at the gateway, but the four Django services still shouldn't accept unauthenticated writes. Webhooks ("Simulate Next Day") and mutations (`POST /api/recommendations/`, creative refresh) require either a valid JWT or the service token. **GET stays `AllowAny`** so the local React-Admin console and Docker healthchecks don't need a login wall — this is a standup demo, not a production lockdown.
 
 ## Where it lives in this repo
 
@@ -26,7 +26,7 @@ They are deliberately different headers. simplejwt looks at `Authorization: Bear
 | `docker-compose.yml` | `SERVICE_TOKEN` + `JWT_SIGNING_KEY` on the four Django services; `SERVICE_TOKEN` on `mcp_server` and `celery_worker` |
 | Seed commands | Create user `demo` / password `demo` |
 
-Write views (`@api_view(["POST"])` webhooks and mutations) stack `@authentication_classes` + `@permission_classes([IsAuthenticated])`. GET viewsets keep the default `AllowAny`. The React-Admin console does not send a JWT — it relies on those open GETs, and talks to the MCP server's approve/sweep/simulate endpoints without a token. JWT is there for API clients (and for tightening reads later); it is not a login wall on the local demo UI.
+Write views (`@api_view(["POST"])` webhooks and mutations) stack `@authentication_classes` + `@permission_classes([IsAuthenticated])`. GET viewsets keep the default `AllowAny`. The React-Admin console does not send a JWT — it relies on those open GETs, and talks to the MCP server's approve/sweep/simulate endpoints without a token. JWT is available for API clients; it is not a login wall on the local demo UI.
 
 ## Key vocabulary
 

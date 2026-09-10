@@ -48,7 +48,7 @@ export const CallRoutingList = () => (
       color="#6E11B0"
       platform="Maestro360"
       role="inbound call routing"
-      summary="Each row is one campaign’s call-center summary. Click through to see which teams answered the phones and how those calls ended."
+      summary="Top Pool shows which team takes the most calls; Non-certified share flags a campaign leaning too heavily on the lower-converting pool."
       terms={[
         { term: "Agent pool", def: "A team of call-center people. Pool A is Medicare-certified and converts ~31% of calls; Pool B is not certified and converts ~18%." },
         { term: "Routing", def: "Which team a new inbound call is sent to. Rule 1: Pool A first. Rule 2: overflow to Pool B when A is full." },

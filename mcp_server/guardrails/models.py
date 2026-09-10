@@ -66,7 +66,7 @@ class ExecutedAction(Base):
     """A write action that actually ran — either auto-executed immediately,
     or executed after a human approved a ProposedAction. pre_action_state is
     an audit snapshot of enough prior state to reconstruct what changed
-    (PLANNING.md §7) — stored for review, not a one-click undo UI."""
+    (PLANNING.md §7)."""
 
     __tablename__ = "executed_actions"
 

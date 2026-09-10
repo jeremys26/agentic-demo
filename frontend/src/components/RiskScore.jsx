@@ -2,7 +2,7 @@ import StatusPill from "./StatusPill";
 import { formatRisk, riskColor } from "../labels";
 
 const HINT =
-  "0–100. Below 30 can run on its own; 30–70 waits for you; 70+ is blocked. A hard safety cap can still hold a low score for review.";
+  "0–100. Below 30 runs automatically; 30–70 waits for your approval; 70+ is blocked. A hard cap can still hold a low score for review.";
 
 export default function RiskScore({ score, breakdown, showHardCap = true }) {
   const label = formatRisk(score);
@@ -12,7 +12,7 @@ export default function RiskScore({ score, breakdown, showHardCap = true }) {
 
   return (
     <span
-      title={hardCap ? `${HINT} This one was held by the hard safety cap.` : HINT}
+      title={hardCap ? `${HINT} This one was held by the hard cap.` : HINT}
       style={{
         display: "inline-flex",
         alignItems: "center",

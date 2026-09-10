@@ -61,11 +61,22 @@ def refresh_request(request, pk):
     Tier 1 plumbing only: creates the request as "pending". Whether it should
     actually happen is decided by the MCP server's risk-scoring guardrail
     (PLANNING.md §7), not by this endpoint.
+
+    Idempotent per creative: the guardrail's execution step calls this and
+    then immediately resolves it in one logical operation (mcp_server's
+    _execute_request_creative_refresh). If the resolve call fails and gets
+    retried, re-creating here would otherwise leave the first request
+    orphaned in "pending" forever while a second one is created — returning
+    the existing pending request instead avoids that pile-up.
     """
     creative = get_object_or_404(CreativeAsset, pk=pk)
     reason = request.data.get("reason")
     if not reason:
         return Response({"error": "reason is required"}, status=400)
+
+    existing = creative.refresh_requests.filter(status=CreativeRefreshRequest.Status.PENDING).first()
+    if existing is not None:
+        return Response(CreativeRefreshRequestSerializer(existing).data, status=200)
 
     refresh = creative.refresh_requests.create(reason=reason)
     return Response(CreativeRefreshRequestSerializer(refresh).data, status=201)

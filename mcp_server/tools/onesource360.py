@@ -128,11 +128,11 @@ async def get_performance_anomalies(
 
             total_spend = sum(float(r["spend"]) for r in rollups)
             total_leads = sum(r["leads"] for r in rollups)
-            if total_leads == 0:
+            target_cpl = float(campaign["target_cpl"])
+            if total_leads == 0 or target_cpl <= 0:
                 return None
 
             windowed_cpl = round(total_spend / total_leads, 2)
-            target_cpl = float(campaign["target_cpl"])
             variance_pct = round((windowed_cpl - target_cpl) / target_cpl * 100, 1)
 
             # Only flag CPL *above* target (PLANNING.md §9). Beating target
@@ -149,6 +149,10 @@ async def get_performance_anomalies(
                 "variance_pct": variance_pct,
             }
 
-        results = await asyncio.gather(*[check(c) for c in campaigns])
-        anomalies = [row for row in results if row is not None]
+        # return_exceptions=True so one campaign's bad data (or a transient
+        # per-request failure) can't take down the whole scan — this same
+        # function backs the Celery anomaly sweep, which would otherwise stop
+        # monitoring every campaign because of one.
+        results = await asyncio.gather(*[check(c) for c in campaigns], return_exceptions=True)
+        anomalies = [row for row in results if row is not None and not isinstance(row, BaseException)]
         return {"threshold_pct": threshold_pct, "window_days": window_days, "anomalies": anomalies}

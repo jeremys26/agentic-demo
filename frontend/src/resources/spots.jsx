@@ -33,7 +33,7 @@ export const SpotList = () => (
       color="#9A6700"
       platform="SmartSpot360"
       role="TV & radio media buying"
-      summary="Each row is one airing of an ad — a specific station, time of day, and date. Budget allocation is the plan for how a pile of money would be split across these combos."
+      summary="Spot CPL is what that single airing cost, divided by the conversions it drove — a finer-grained view than the campaign-level CPL on the Campaigns page."
       terms={[
         { term: "Spot", def: "One paid airing. “WSVN Miami / Daytime on Aug 15 for $210” is a spot." },
         { term: "Station", def: "The TV or radio channel in a market (WSVN Miami, WQBA Miami)." },

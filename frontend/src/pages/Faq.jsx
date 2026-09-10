@@ -89,7 +89,7 @@ const TABS = [
     color: "#0A21C7",
     name: "Tool Calls",
     detail:
-      "The full step-by-step trace of everything Agent360 checked — including the lookups that didn't lead to an action. If you want to see its full reasoning process, not just the conclusion, this is that record. Updates live while an investigation is in progress.",
+      "The full step-by-step trace of everything Agent360 checked, including lookups that didn't lead to an action — the reasoning process, not just the conclusion. Updates live while an investigation is in progress.",
   },
   {
     icon: <HubIcon fontSize="small" />,
@@ -134,11 +134,11 @@ const OUTCOMES = [
 const FAQ_ITEMS = [
   {
     q: "Can Agent360 spend money or make changes without me knowing?",
-    a: "No. Every action it takes — automatic or not — is logged in Agent Actions the instant it happens, with its reasoning attached. Auto-executed actions are reserved for small, well-supported, low-risk changes only, and a fixed safety ceiling applies on top of the risk scoring itself, so nothing large can slip through even if the scoring were ever wrong on a given case. Anything bigger always waits for a person.",
+    a: "No. Every action it takes — automatic or not — is logged in Agent Actions the instant it happens, with its reasoning attached. Auto-execution is reserved for small, well-supported, low-risk changes, and a fixed safety ceiling sits on top of the risk scoring itself, so nothing large can slip through even if the scoring is wrong. Anything bigger always waits for a person.",
   },
   {
     q: "What happens if it gets something wrong?",
-    a: "Every auto-executed action is logged together with a snapshot of what the campaign looked like right beforehand, so you can see exactly what changed and audit it after the fact. And for anything above the smallest, safest tier of change, it never executes at all without a person approving it first — there's no scenario where a large or uncertain change happens unsupervised.",
+    a: "Every auto-executed action is logged with a snapshot of what the campaign looked like right before the change, so you can see exactly what happened and review it later. And for anything above the smallest, safest tier of change, it never executes without a person approving it first — a large change never happens unsupervised.",
   },
   {
     q: "Can this be turned off, or made stricter?",

@@ -22,18 +22,18 @@ Tracing one request all the way through:
 
 This is the shape a walkthrough should follow — not a script to read verbatim, but the sequence that makes each piece land before the next one is introduced:
 
-1. **Open the Overview dashboard** (`frontend/src/pages/Overview.jsx`, react-admin's `dashboard` prop, shown at `/`). One flagged campaign, three pending approvals, real recent activity — this is "what needs my attention" answered before clicking into anything, which is the actual point of a stakeholder-facing console.
-2. **Point at the flagged campaign** (Campaigns list, `~+50% CPL` badge) — this is what `PLANNING.md` §9 seeded: "Medicare Advantage – Southeast TV," a real compound-cause spike, not a synthetic number picked to look dramatic.
+1. **Open the Overview dashboard** (`frontend/src/pages/Overview.jsx`, react-admin's `dashboard` prop, shown at `/`). After a clean `mcp_server` restart: one flagged campaign, empty Agent Actions counters, and a recent sweep in the activity feed — "what needs my attention" before clicking into anything.
+2. **Point at the flagged campaign** (Campaigns list, ~+49% CPL badge) — this is what `PLANNING.md` §9 seeded: "Medicare Advantage – Southeast TV," a compound-cause spike from the seed data.
 3. **Ask Claude Code to investigate**, in plain language, no tool names needed. It calls `list_campaigns`, then `get_performance_anomalies` (confirms ~+49% trailing-week CPL, about $67 vs a $45 target), then rules out a media-buy change via SmartSpot360 (useful negative evidence), then finds creative CTR decline via Captivator360 (CR-114, last-week CTR ~25% below its own first week) and a call-routing shift via Maestro360 (Pool B share up to ~16% lifetime, visibly spiking further in the final week on the Call Routing Show page's weekly chart) — neither alone explains a ~49% jump; together they do.
 4. **Show the three outcomes landing from that one investigation**: a small reallocation auto-executes and shows up in Agent Actions as already-done; a larger one queues in "Needs Your Attention" with its reasoning attached, waiting on a human; a creative-refresh request gets blocked outright because it would leave the campaign with zero active creatives — the agent is told why, not just refused.
 5. **Open the Tool Calls trace** to show the full technical detail is one click away — the plain-language rationale is the default view (`agentActions.jsx`), not the only view.
-6. **(Tier 2 flourish) Onboard RankPulse-sim live**: uncomment one import line in `mcp_server/main.py`, rebuild the container, and a fifth platform's data is agent-accessible — dramatizing `PLANNING.md` §2's actual structural business problem (BMG360 grows by acquisition; new tooling needs to join fast) rather than just asserting it's solved.
-7. **(Tier 2 flourish) Same server, Cursor as the client** — re-run step 3's question in Cursor instead of Claude Code. Identical tool calls, identical guardrail decisions, because none of the governance lives in either client.
-8. **(Tier 2 flourish) Advance one day** from Overview — a new day's data lands through each platform's own webhook, then the sweep re-flags campaign 1. GraphiQL at `/graphql` is the one-query version of the same cross-platform picture.
+6. **Onboard RankPulse-sim live**: uncomment one import line in `mcp_server/main.py`, rebuild the container, and a fifth platform's data is agent-accessible — dramatizing `PLANNING.md` §2's acquisition-integration problem rather than just asserting it's solved.
+7. **Same server, Cursor as the client** — re-run step 3's question in Cursor instead of Claude Code. Identical tool calls, identical guardrail decisions, because none of the governance lives in either client.
+8. **Advance one day** from Overview — a new day's data lands through each platform's own webhook, then the sweep re-flags campaign 1. GraphiQL at `/graphql` is the one-query version of the same cross-platform picture.
 
 ## For a non-technical audience
 
-`docs/for-marketers.md` is the parallel version of this recap aimed at the people who'd actually use the approval queue, not build it — same demo scenario, no MCP/Django/risk-score vocabulary. Point stakeholders there first; this doc and `docs/learning/*` are for anyone who wants to know how it actually works.
+`docs/for-marketers.md` is the parallel version of this recap aimed at the people who'd actually use the approval queue, not build it — same demo scenario, plain-language outcomes and FAQ, plus a short glossary. Point stakeholders there first; this doc and `docs/learning/*` are for anyone who wants to know how it actually works.
 
 ## Key vocabulary (cumulative)
 

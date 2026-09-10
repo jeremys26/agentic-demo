@@ -48,7 +48,7 @@ before the change, so it can always be reviewed after the fact.
 **⏳ Needs your approval.** Medium-risk changes stop and wait for a person. You'll find it in
 **Agent Actions** with the reasoning written in plain business language, and *Approve* / *Reject*
 buttons right on the row. Nothing happens until you decide. Rejecting one is always safe — it
-simply declines that specific proposal and doesn't undo or break anything.
+declines that specific proposal and doesn't undo or break anything.
 
 **🚫 Blocked.** Anything that would cross a hard safety ceiling gets refused outright, no matter
 how the rest of the scoring came out. Agent360 doesn't ask first in this case — it declines and
@@ -66,8 +66,8 @@ This is the seeded demo scenario you’ll see if you run the investigation yours
 production incident, but the same story the console and agent tools are built around.
 
 **The problem.** “Medicare Advantage – Southeast TV” had a target cost per lead of **$45**. Over
-the most recent week of activity, its actual cost per lead had climbed to roughly **$67** —
-about **49% over target** — while overall spend hadn’t changed. Something was making each lead
+the most recent week of activity, its actual cost per lead had climbed to **$67.21** —
+**49% over target** — while overall spend hadn’t changed. Something was making each lead
 meaningfully more expensive to generate, and no single dashboard showed why.
 
 **The investigation.** Asked to look into it, Agent360 worked through each connected system in
@@ -77,7 +77,7 @@ turn:
   spot mix hadn't changed, so a bad buying decision wasn't the cause.
 - It checked the creative system next and found the campaign's only active ad ("CR-114") had gone
   stale: first-week click-through rate around 2.0% had fallen to about 1.5% over
-  the last week — roughly a 25% drop versus its own launch, past the 20% refresh trigger.
+  the last week — a **25%** drop versus its own launch, past the 20% refresh trigger.
 - It checked the call-routing system and found calls had been quietly drifting toward a
   lower-converting team that isn't Medicare-certified — a compliance-relevant detail given the
   vertical, and a pattern invisible unless you're specifically comparing routing data against
@@ -124,7 +124,7 @@ always waits for a person.
 Every auto-executed action is logged together with a snapshot of what the campaign looked like
 right beforehand, so you can see exactly what changed and audit it after the fact. And for anything above the
 smallest, safest tier of change, it never executes at all without a person approving it first —
-there's no path where a large or uncertain change happens unsupervised.
+there's no path where a large change happens unsupervised.
 
 **Can this be turned off, or made stricter?**
 Yes. The thresholds that decide what counts as auto-executed, needs-review, or blocked are
@@ -151,6 +151,13 @@ proposal.
 **Can Agent360 touch anything outside these four systems?**
 No. It only has access to the four connected systems below, and only through a fixed set of
 predefined actions. It can't take any action that isn't explicitly one of those defined tools.
+
+**Can I see the actual code behind a decision, not just a summary?**
+Yes, and not just in principle — the console's Systems pages will show it to you directly. Open
+any system and expand its list of tools, and you'll find the real code that runs, pulled live from
+the file it lives in, not a paraphrase of it. The same is true for the scoring logic itself: the
+function that decides auto-execute vs. approval vs. block is right there to read, in full. Nothing
+about how a decision got made is hidden behind a summary someone has to take on faith.
 
 ---
 

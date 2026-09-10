@@ -646,7 +646,13 @@ async def resolve_proposed_action(proposed_action_id: int, approve: bool) -> dic
     tool: an agent must never approve its own proposed action.
     """
     async with SessionLocal() as session:
-        proposed = await session.get(ProposedAction, proposed_action_id)
+        # with_for_update: two near-simultaneous approve calls for the same
+        # id (a UI double-click, a client retry) would otherwise both read
+        # status=="pending_approval" before either commits, and both run the
+        # executor — the row lock makes the second call block until the
+        # first transaction commits, then it re-reads and sees the status
+        # has already changed.
+        proposed = await session.get(ProposedAction, proposed_action_id, with_for_update=True)
         if proposed is None:
             return {"status": "error", "detail": f"no proposed action with id {proposed_action_id}"}
         if proposed.status != "pending_approval":

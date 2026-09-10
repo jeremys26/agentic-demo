@@ -2,7 +2,7 @@
 
 > An MCP-based governed gateway that lets an LLM agent safely investigate and act across independent marketing-technology systems, with autonomy calibrated to risk rather than gated behind a single blanket "ask a human every time" rule. Modeled on a real company's public technology stack as a grounded case study, rather than an invented scenario.
 
-Status: **complete.** Feature scope is closed at the current build — remaining work is polish of what already exists, not new features. Tier 1 (phases 1–6 + 13) and Tier 2 (anomaly sweep, RankPulse-sim onboarding demo, JWT + service-token auth, GraphQL join, Simulate Next Day, GitHub Actions, OpenAPI) are live. All ten learning docs are complete (`LEARNING.md`). `.cursor/mcp.json` points at the local MCP server; a one-time `cursor-agent login` is the only setup step for the headless Cursor proof (credentials stay with whoever runs the demo). Restarting `mcp_server` clears its audit/approval tables and re-runs the anomaly sweep so demos start with a clean Agent Actions list.
+Status: **complete.** Feature scope is closed at the current build. Tier 1 (phases 1–6 + 13) and Tier 2 (anomaly sweep, RankPulse-sim onboarding demo, JWT + service-token auth, GraphQL join, Simulate Next Day, GitHub Actions, OpenAPI) are live. All ten learning docs are complete (`LEARNING.md`). `.cursor/mcp.json` points at the local MCP server; a one-time `cursor-agent login` is the only setup step for the headless Cursor proof (credentials stay with whoever runs the demo). Restarting `mcp_server` clears its audit/approval tables and re-runs the anomaly sweep so demos start with a clean Agent Actions list.
 
 ---
 
@@ -11,10 +11,10 @@ Status: **complete.** Feature scope is closed at the current build — remaining
 Three goals:
 
 1. A concrete demonstration of a specific, transferable engineering pattern: a **governed MCP gateway** that lets an LLM agent read from and act on multiple independently-owned backend systems safely, with autonomy calibrated to risk instead of a single blanket human-approval gate. This is a general problem, not a niche one — any organization with several internal systems that don't talk to each other, especially ones that grow by acquiring point solutions or letting different teams adopt their own tools, runs into some version of it.
-2. A demonstration of the **integration and translation work that sits at the center of a solutions-engineering role**: wiring together existing, heterogeneous systems — some already touched by ad hoc AI tooling, some just a pile of unconnected APIs different teams happen to use — into one coherent, safe, agent-accessible layer, and then making that layer legible to the non-technical people who actually have to use it day to day, not just to other engineers. Both halves of that — the integration and the translation — are treated as first-class parts of this project, not just the code.
+2. A demonstration of the **integration and translation work that sits at the center of a solutions-engineering role**: wiring together existing, heterogeneous systems — some already touched by ad hoc AI tooling, some just a pile of unconnected APIs different teams happen to use — into one coherent, safe, agent-accessible layer. Then making that layer legible to the non-technical people who use it day to day, not just to other engineers. Both halves — integration and translation — are treated as first-class parts of this project, not just the code.
 3. A **learning vehicle**: most of this stack (Django, DRF, Celery, MCP server development, React-Admin) was new territory at the start. The repo ships with a parallel set of learning docs written alongside the code, explaining what each piece does and why, so the process of building this is itself the training.
 
-Rather than invent a generic scenario, this project is grounded in a real company's real, publicly-documented technology: BMG360, a performance-marketing agency that runs four proprietary platforms — a data warehouse, a media-buying engine, a creative platform, and a call-routing system — each individually sophisticated, with no public evidence they talk to each other autonomously (§2). That's a common shape of problem, and building against a real, if simulated, version of it keeps the data model and constraints honest instead of convenient.
+Rather than invent a generic scenario, this project is grounded in a real company's publicly documented technology: BMG360, a performance-marketing agency that runs four proprietary platforms — a data warehouse, a media-buying engine, a creative platform, and a call-routing system — each individually sophisticated, with no public evidence they talk to each other autonomously (§2). That's a common shape of problem, and building against a real, if simulated, version of it keeps the data model and constraints honest instead of convenient.
 
 **A note on where the data models come from**: this project has no non-public knowledge of BMG360's actual systems, and is **not affiliated with BMG360**. The four simulated platforms are modeled from (a) BMG360's own public descriptions of what each platform does, (b) one piece of real technical detail — an AWS engineering blog post on SmartSpot360's actual architecture — and (c) standard, industry-wide patterns for how direct-response/martech systems represent this kind of data (campaigns with spend/CPL rollups, creative assets with CTR over time, call-center routing and outcome logs). None of that last category is BMG360-specific. This boundary — researched fact vs. plausible simulation — is stated explicitly in the repo's README, not glossed over.
 
@@ -35,7 +35,7 @@ Rather than invent a generic scenario, this project is grounded in a real compan
 
 **Whitespace confirmed**: no public mention (blog, case studies, press, LinkedIn) of these four systems being connected by an autonomous/LLM agent layer — which is what makes this a real gap to build against rather than a solved problem restated.
 
-**Why this matters**: modeling the simulated platforms on SmartSpot360's real, publicly-documented architecture — rather than inventing a generic scenario — means the resulting system reflects genuine constraints of this kind of infrastructure (event-driven pipelines, warehouse-backed rollups, API-gated tool access) instead of a toy example built to be convenient.
+**Why this matters**: modeling the simulated platforms on SmartSpot360's real, publicly-documented architecture means the resulting system reflects genuine constraints of this kind of infrastructure (event-driven pipelines, warehouse-backed rollups, API-gated tool access) instead of a toy example built to be convenient.
 
 **The two-layer business problem this project answers:**
 1. **Immediate**: when CPL spikes on a campaign, nothing in a siloed four-platform stack can explain why across systems — a human has to manually cross-reference dashboards, which doesn't scale as campaign count grows.
@@ -47,15 +47,15 @@ Rather than invent a generic scenario, this project is grounded in a real compan
 
 **Agent360**: an MCP server that exposes tools across four standalone, independently-deployed simulated platforms (OneSource360-sim, SmartSpot360-sim, Captivator360-sim, Maestro360-sim), used by **Claude Code (or Cursor) as the agent** to diagnose performance problems and act on them — with autonomy calibrated to risk, not gated behind a single blanket "ask a human every time" rule.
 
-**Demo narrative**: a campaign has a deliberate, compound-cause CPL spike seeded into its data (concrete numbers in §9). React-Admin shows it flagged. You open Claude Code — already connected to the local MCP server — and ask it, in plain language, to investigate. It calls tools live across all four independent services, rules out one cause (the media buy didn't change), and finds the real root cause spanning two systems that no single platform's own dashboard would show. It proposes a set of actions, each scored for risk: a small, well-supported change **auto-executes** and is logged; the larger reallocation is **routed to the human approval queue** with its reasoning attached; a hypothetical action that would exceed a hard limit is **blocked outright**, with the agent told why. One session shows all three tiers of autonomy, not a single repetitive "please approve" loop.
+**Demo narrative**: a campaign has a deliberate, compound-cause CPL spike seeded into its data (concrete numbers in §9). React-Admin shows it flagged. You open Claude Code — already connected to the local MCP server — and ask it, in plain language, to investigate. It calls tools live across all four independent services. It rules out one cause (the media buy didn't change) and finds the real root cause spanning two systems that no single platform's own dashboard would show. It then proposes a set of actions, each scored for risk: a small, well-supported change **auto-executes** and is logged; the larger reallocation is **routed to the human approval queue** with its reasoning attached; a creative-refresh request that would leave the campaign with zero active creatives is **blocked outright**, with the agent told why. One session shows all three tiers of autonomy, not a single repetitive "please approve" loop.
 
-**Optional live flourish**: since the tool registry is config-driven, onboard a fifth, previously-unbuilt mock platform live during the demo — a stand-in for a newly-acquired tool — to dramatize how fast a new system joins the existing agent ecosystem, directly answering BMG360's structural acquisition-integration problem (§2). This is arguably the clearest demonstration of the actual day-to-day work described in §1 — most of a solutions-engineering job isn't designing one clean system from scratch, it's plugging one more messy, pre-existing thing into something that already has to keep working.
+**Live fifth-platform flourish**: RankPulse-sim is already built and running — a stand-in for a newly-acquired tool — but left unregistered until one import line is uncommented during the demo. That dramatizes how fast a new system joins the existing agent ecosystem, answering BMG360's structural acquisition-integration problem (§2).
 
 ---
 
 ## 4. Scope
 
-This is a **standup demo and a learning project, not a production system**. Feature scope is **closed** at what's already in the repo. Remaining work is polish of existing features — not new platforms, APIs, models, packaging, or hosting.
+This is a **standup demo and a learning project, not a production system**. Feature scope is **closed** at what's already in the repo.
 
 It was built in two passes so the pitch (Tier 1) was demoable before the extras (Tier 2). Both passes are done.
 
@@ -65,7 +65,7 @@ It was built in two passes so the pitch (Tier 1) was demoable before the extras 
 - Four **standalone** Django services (own project, own database each — not apps inside one shared backend), with real models, migrations, and DRF REST APIs
 - Seed data generator with the deliberate compound-cause scenario baked in (§9)
 - MCP server exposing read + write tools across all four services, with its own database for tool-call logging
-- **Risk-scored guardrail layer** on write tools — not a binary approve/reject gate, but a computed risk score routing each action to auto-execute / human approval / hard block (§7), with a score-independent hard cap, configurable thresholds, and pre-action state snapshotting on auto-executed actions for audit. This is the headline differentiator of the whole project, and the most heavily tested code in the repo.
+- **Risk-scored guardrail layer** on write tools — not a binary approve/reject gate, but a computed risk score routing each action to auto-execute / human approval / hard block (§7), with a score-independent hard cap, configurable thresholds, and pre-action state snapshotting on auto-executed actions for audit. This is the project's core differentiator, and the most heavily tested code in the repo.
 - Claude Code wired up and working live against the MCP server
 - React-Admin: campaign views + an agent-actions view showing all three outcome states, with plain-language reasoning as the default view (§7, §10)
 - Technical learning docs written alongside each piece as it's built, plus the plain-language guide for non-technical users once the demo works (§12)
@@ -99,7 +99,7 @@ flowchart TB
         RP[RankPulse-sim<br/>FastAPI, unregistered by default]
     end
 
-    Gen[Data Generator<br/>seed script + optional Celery-beat anomaly sweep] --> Services
+    Gen[Data Generator<br/>seed script + Celery-beat anomaly sweep] --> Services
 
     MCP[MCP Server — the governed gateway<br/>FastAPI + Pydantic tool schemas<br/>risk-scored routing: auto-execute / approve / block<br/>call logging, owns its own DB] -->|REST calls, HTTP only| Services
 
@@ -110,9 +110,9 @@ flowchart TB
     UI -->|agent actions API| MCP
 ```
 
-**Key design principle — the MCP server is a governed gateway, not just a tool proxy.** Every write action gets scored for risk and routed accordingly, *regardless of which client is driving it* — Claude Code today, Cursor as a second proof point, a different vendor's agent tomorrow. Governance lives at the tool layer, not the agent layer, which means the system doesn't care which LLM or vendor sits on the other end. That's the actual answer to "what happens when you switch models" — nothing has to change. Tier 2's Cursor test exists specifically to prove this claim rather than just assert it.
+**Key design principle — the MCP server is a governed gateway, not just a tool proxy.** Every write action gets scored for risk and routed accordingly, *regardless of which client is driving it* — Claude Code today, Cursor as a second proof point, a different vendor's agent tomorrow. Governance lives at the tool layer, not the agent layer, which is the actual answer to "what happens when you switch models": nothing has to change. Tier 2's Cursor test exists specifically to prove that claim rather than just assert it.
 
-**Why four standalone services, not four apps in one Django project**: the entire pitch is "these systems didn't talk to each other, and I built the thing that connects them." If all four lived in one process sharing one database, that claim wouldn't survive scrutiny — it would just be one app with internal modules. Four independent services (own database, HTTP-only communication, no shared ORM or imports across service boundaries) make the connectivity claim literally true. This does **not** require four separate git repositories — repo layout and runtime independence are orthogonal; one monorepo containing four independent, separately-containerized services is a completely normal pattern and far easier for a reviewer to clone and evaluate. It also means running `django-admin startproject` for real, multiple times — better practice for learning Django from scratch than hiding the pattern inside one project's folder structure.
+**Why four standalone services, not four apps in one Django project**: the entire pitch is "these systems didn't talk to each other, and I built the thing that connects them." If all four lived in one process sharing one database, that claim wouldn't survive scrutiny — it would just be one app with internal modules. Four independent services (own database, HTTP-only communication, no shared ORM or imports across service boundaries) make the connectivity claim literally true. This does **not** require four separate git repositories — repo layout and runtime independence are orthogonal. One monorepo containing four independent, separately-containerized services is a normal pattern, and easier for a reviewer to clone and evaluate. It also means running `django-admin startproject` for real, multiple times — better practice for learning Django from scratch than hiding the pattern inside one project's folder structure.
 
 **No custom agent-orchestration service.** Claude Code already has a production-grade tool-calling loop; rebuilding one would be wasted effort that also costs API money. This also means a live, step-by-step trace of the agent's tool calls comes for free — it's just how Claude Code's interface already works, not something built separately for effect.
 
@@ -170,7 +170,7 @@ Each is a **standalone Django project** (own `manage.py`, `settings.py`, `Docker
   - **Regulatory sensitivity** — a multiplier for regulated verticals (Medicare Advantage gets stricter thresholds, tying into the Pool B certification detail in §9) — same definition for every tool.
 
   **Routing** — the thresholds below are **configurable policy values, not constants baked into the agent**. That distinction matters for how this reads to a risk-conscious technical audience: the business sets the dial, the deterministic layer enforces it, the agent doesn't get to decide its own leash.
-  - **Below the auto-execute threshold (default 30) → auto-execute** — *and only if the action also clears a fixed, score-independent hard cap* (e.g., never auto-execute a reallocation above 5% of a campaign's baseline weekly spend, full stop, regardless of what the score says). This is defense in depth against a bug in the scoring function itself — a single miscalculation shouldn't be able to let a large action through unsupervised. Fires immediately, logged as `ExecutedAction` **with the pre-action state snapshotted alongside it** for audit (visible in Agent Actions / the technical trace — not a one-click undo UI). Surfaced in React-Admin's Agent Actions list as already-done, not something waiting on anyone.
+  - **Below the auto-execute threshold (default 30) → auto-execute** — *and only if the action also clears a fixed, score-independent hard cap* (e.g., never auto-execute a reallocation above 5% of a campaign's baseline weekly spend, full stop, regardless of what the score says). This is defense in depth against a bug in the scoring function itself — a single miscalculation shouldn't be able to let a large action through unsupervised. Fires immediately, logged as `ExecutedAction` **with the pre-action state snapshotted alongside it** for audit (visible in Agent Actions / the technical trace). Surfaced in React-Admin's Agent Actions list as already-done, not something waiting on anyone.
   - **From the auto-execute threshold up to (but not including) the block threshold (default 30 up to 70) → human approval.** A `ProposedAction` record is created with status `pending_approval`; the tool returns that status to the agent, not a completed result. A human approves/rejects in React-Admin; approval triggers the real write call.
   - **At or above the block threshold (default 70) → hard block.** The tool returns a rejection with the reason to the agent instead of creating any pending record; the agent can propose a smaller or different action instead.
 
@@ -189,11 +189,11 @@ No custom orchestration code for Tier 1. Setup is configuration, not implementat
 2. Register it with `claude mcp add --transport http agent360 http://localhost:8100/mcp`.
 3. Converse naturally — Claude Code's own agent loop handles tool selection, multi-step reasoning, and retries. Every tool call flows through the MCP server, which logs it to `AgentToolCall` and routes it through the risk-scoring guardrail (§7).
 
-**Tier 2 — provider-agnostic proof**: register the same MCP server in **Cursor's** MCP config and re-run the same investigation there. Cursor is a genuinely independent client implementation (built by Anysphere, not Anthropic), already available at no incremental cost — this is a cleaner proof of "same server, different client" than routing through another Anthropic surface would have been, and needs no new code.
+**Tier 2 — provider-agnostic proof**: the same MCP server is registered in **Cursor's** MCP config (`.cursor/mcp.json`) so the investigation can be re-run there. Cursor is a genuinely independent client implementation (built by Anysphere, not Anthropic) — a cleaner proof of "same server, different client" than routing through another Anthropic surface, and it needed no new gateway code.
 
-**Tier 2 — live fifth-platform onboarding demo**: since the tool registry (§7) is config-driven, build one more small mock platform ahead of time but leave it *unregistered*, then register it live during the demo — a config entry plus a thin adapter, no changes to the MCP server's core code. This dramatizes, concretely, how fast a newly-acquired platform could join the existing agent ecosystem (§2's structural business problem), rather than just asserting it.
+**Tier 2 — live fifth-platform onboarding demo**: RankPulse-sim is built and running, with its MCP tool left *unregistered* until one import line is uncommented in the demo — a thin adapter plus a registry entry, no changes to the MCP server's core code. That shows how a newly-acquired platform joins the existing agent ecosystem (§2's structural business problem), rather than just asserting it.
 
-**Tier 2 — proactive flagging without an LLM in the loop**: a Celery beat schedule, hosted **alongside the MCP server itself** — not a separate, unowned service — periodically calls the exact same function an agent would use (`get_performance_anomalies` across active campaigns) and writes a `FlaggedCampaign` record to its own database when a rollup crosses the CPL threshold. Pure SQL/math, zero LLM cost. The MCP server is the only component with a clean, already-built reason to read across all four services this way, so this is where the task belongs rather than living inside one of the sim services or as a floating fifth component. Worth noting explicitly: **scheduled monitoring and agent-driven investigation are the same code path**, just triggered differently — a timer instead of a conversation. This is what shows up in React-Admin as "needs investigation," which is what you point Claude Code at during the demo.
+**Tier 2 — proactive flagging without an LLM in the loop**: a Celery beat schedule, hosted **alongside the MCP server itself** — not a separate, unowned service — periodically calls the exact same function an agent would use (`get_performance_anomalies` across active campaigns) and writes a `FlaggedCampaign` record to its own database when a rollup crosses the CPL threshold. Pure SQL/math, zero LLM cost. The MCP server is the only component with a clean, already-built reason to read across all four services this way, so this is where the task belongs rather than living inside one of the sim services or as a floating fifth component. **Scheduled monitoring and agent-driven investigation are the same code path** — a timer instead of a conversation. This is what shows up in React-Admin as "needs investigation," which is what you point Claude Code at during the demo.
 
 ---
 
@@ -248,15 +248,15 @@ React-Admin's data provider is **resource-routed across five backends** — the 
 | Tool registries, schema validation | Tool registry design, Pydantic schemas, guardrails — §7 |
 | Django backend design, Postgres-backed workflow state | 4 standalone services + MCP server's own AgentToolCall/ProposedAction/FlaggedCampaign DB |
 | DRF endpoints for a React frontend | §10 |
-| Celery async processing | Tier 2: anomaly sweep on a beat schedule; Simulate Next Day is HTTP-triggered (Celery task exists but is unused by the demo UI) |
+| Celery async processing | Tier 2: anomaly sweep on a beat schedule; Simulate Next Day via `POST /simulate-next-day` |
 | LLM agent integration | Claude Code as the agent (zero cost); Cursor as a second, independent client (proves the design isn't tied to one vendor) |
 | React-Admin dashboards | §10 |
 | API documentation practices | Auto-generated OpenAPI docs per service (drf-spectacular) + the MCP server's own `/tools` introspection endpoint (§7) — distinct from the pedagogical learning docs in §12, which teach rather than reference |
 | FastAPI, Pydantic, pytest | MCP server stack + test suite, with the heaviest coverage on the risk-scoring function specifically (§7) |
-| OAuth2, JWT, webhook security | Tier 2 — JWT for users, client-credentials token for MCP server → each service |
+| JWT, service-token, webhook security | Tier 2 — JWT for users, client-credentials-style token for MCP server → each service |
 | PostgreSQL schema design | 5 independent database schemas (4 services + MCP server) |
 | Docker, CI/CD | Docker Compose orchestrating all services locally (Tier 1); GitHub Actions running MCP pytest + the frontend production build (Tier 2) |
-| Data-warehouse / ETL-style design thinking | Referenced conceptually in OneSource360-sim's design; not run against a real warehouse in this demo |
+| Performance-warehouse modeling | OneSource360-sim campaign + daily rollup schema and seed scenario (§6, §9) |
 
 ---
 
@@ -291,13 +291,13 @@ Since most of this stack is new, the repo carries a **parallel set of learning d
 `docs/for-marketers.md` — written for the actual people this system is built for: a marketing ops analyst or account manager who'd use the approval queue, not an engineer. This is **not** a simplified version of the technical docs; it's a different document with a different job, and it's as much a part of the deliverable as the code, given §1's second goal.
 
 **Structure:**
-- What this is and why it exists, in plain language — no mention of MCP, Django, or risk scores by name
+- What this is and why it exists, in plain language for day-to-day users
 - What the three outcomes (auto-executed / needs your approval / blocked) actually mean for someone using it day to day
 - A walkthrough of the demo scenario (§9) told as a business story — a campaign's cost-per-lead went up, here's what turned out to be going on, here's what happened next — not as a data table
 - A short FAQ anticipating the real questions a cautious stakeholder asks: can it spend money without me knowing? What happens if it's wrong? Can this be turned off or made stricter?
 - A one-line-per-term glossary (MCP, agent, guardrail, risk score) for anyone curious enough to peek at the technical side
 
-Written once the working demo exists (§14), so it can describe and reference the real thing instead of a hypothetical.
+Written against the working demo (§14), so it describes the real seeded scenario and outcomes.
 
 ---
 
@@ -313,7 +313,8 @@ agent360/
 ├── docs/
 │   ├── learning/                # topic-by-topic technical learning docs, see §12.1
 │   ├── for-marketers.md          # plain-language guide for non-technical users, see §12.2
-│   └── demo-script.md            # live walkthrough for a CTO / stakeholder demo
+│   ├── field-notes.md            # live walkthrough for a CTO / stakeholder demo, illustrated with a real run
+│   └── assets/field-notes/       # screenshots embedded in field-notes.md
 ├── services/
 │   ├── onesource360/            # standalone Django project, own DB
 │   ├── smartspot360/            # standalone Django project, own DB
@@ -334,7 +335,7 @@ agent360/
 
 Each phase ended with the matching learning doc. This is a historical record of how the repo was built, not a backlog.
 
-**Sequencing principle**: prove the genuinely novel, risky part first — the MCP server talking to Claude Code — with the smallest possible slice, before sinking time into building out all four services. Building breadth (4 services) before validating the one integration that's actually unfamiliar territory would mean discovering any problems with it last, after the easy, repetitive work is already done. That's backwards; do it first instead.
+**Sequencing principle**: prove the genuinely novel, risky part — the MCP server talking to Claude Code — with the smallest possible slice, before sinking time into building out all four services. Validating the unfamiliar integration first means problems surface early, not after the easy, repetitive work is already done.
 
 1. **Walking skeleton** *(Tier 1)* — Docker Compose scaffolding; build **just** OneSource360-sim's `Campaign` + `DailyPerformanceRollup` models and API; build the MCP server with **exactly one tool** (`get_campaign_performance`) wired to it; connect Claude Code and confirm a real tool call round-trips end to end. Nothing else gets built until this works. → `01-django-basics.md`, `05-mcp-servers.md` started
 2. **Fill out all four services** *(Tier 1)* — flesh out OneSource360-sim fully, then build SmartSpot360-sim, Captivator360-sim, Maestro360-sim following the now-proven pattern; seed command with the compound-cause scenario; auto-generated OpenAPI docs per service → `02-drf-rest-apis.md`, `03-postgres-schema-design.md`
@@ -345,7 +346,7 @@ Each phase ended with the matching learning doc. This is a historical record of 
 7. **Async layer** *(Tier 2)* — Redis + Celery hosted alongside the MCP server; anomaly sweep reuses the MCP server's own tool-call code path; per-service webhook receivers for live event simulation → `04-celery-and-async.md`
 8. **Auth hardening** *(Tier 2)* — JWT + client-credentials token → `07-auth-jwt-oauth2.md`
 9. **Provider-agnostic proof** *(Tier 2)* — register the MCP server in Cursor, re-run the investigation there
-10. **Live fifth-platform onboarding demo** *(Tier 2)* — build one more small mock platform, leave it unregistered until the live demo moment
+10. **Live fifth-platform onboarding demo** *(Tier 2)* — RankPulse-sim built and running, left unregistered until the live demo moment
 11. **Frontend polish** *(Tier 2)* — tool-call trace log, platform data explorers, flagged campaigns view
 12. **GraphQL + CI + Docker recap** *(Tier 2)* — one join query, GitHub Actions, `09-docker-compose.md`
 13. **Final wrap-up** — `10-architecture-recap.md`, README with demo script
@@ -358,13 +359,13 @@ Each phase ended with the matching learning doc. This is a historical record of 
 |---|---|---|
 | Project name | **Agent360** | — |
 | Creative platform spelling | **Captivator360** | Confirmed from BMG360's own site |
-| Cost | **$0** for Tier 1; pennies for Tier 2's provider-agnostic proof | Explicit constraint, given an honest number for the one place cost could reappear |
-| Agent runtime | **Claude Code** (Tier 1), **Cursor** (Tier 2 proof) — not a custom hand-written orchestration loop, not the Anthropic API | Zero cost, no orchestration code to build/maintain, more convincing live demo; Cursor is a genuinely independent vendor implementation, which is a cleaner vendor-agnostic proof than routing through another Anthropic surface |
+| Cost | **$0** local stack; agent runs through an existing Claude / Cursor subscription | Explicit zero paid-API-key constraint for the demo |
+| Agent runtime | **Claude Code** (Tier 1), **Cursor** (Tier 2 proof) — not a custom hand-written orchestration loop, not the Anthropic API | Zero orchestration code to build/maintain, more convincing live demo; Cursor is a genuinely independent vendor implementation, which is a cleaner vendor-agnostic proof than routing through another Anthropic surface |
 | Service architecture | **Four standalone Django services, one monorepo** — not apps inside one shared backend, not four separate repos | Only real separation (own process, own DB, HTTP-only) makes the "connected disconnected systems" claim survive scrutiny; repo layout is a separate, non-architectural concern |
 | Data model sourcing | Public research + industry-standard martech patterns + scenario-driven design; explicitly not internal BMG360 knowledge | Stated transparently in-repo rather than implied |
 | Demo scenario | Compound-cause CPL spike (creative CTR decline + call routing shift to a lower-converting, non-certified pool) on one seeded campaign | Only explainable by combining 2 systems; cheap compliance detail pulled from BMG360's own public material |
-| Approval model | **Risk-scored, three-tier autonomy** (auto-execute / human approval / hard block) — not a single binary approve/reject gate | Promoted to Tier 1 as the headline differentiator; answers the real question about deploying autonomous agents responsibly, not just "can it call tools" |
-| Live demo flourish | Optional live onboarding of a fifth, previously-unregistered mock platform via the config-driven tool registry | Dramatizes the acquisition-integration structural business problem concretely instead of just asserting it |
+| Approval model | **Risk-scored, three-tier autonomy** (auto-execute / human approval / hard block) — not a single binary approve/reject gate | Promoted to Tier 1 as the project's core differentiator; answers the real question about deploying autonomous agents responsibly, not just "can it call tools" |
+| Live demo flourish | RankPulse-sim built and running, left unregistered until one import is uncommented | Dramatizes the acquisition-integration structural business problem concretely instead of just asserting it |
 | Auto-execute safety | Added a fixed, score-independent hard cap and pre-action state snapshotting for audit; made risk thresholds configurable policy rather than hardcoded constants | Defense in depth against a scoring-function bug; reframes the optics from "the AI trusts itself" to "the business sets policy, the system enforces it" — matters for how this lands with a risk-conscious audience |
 | Risk-scoring inputs | Defined magnitude/confidence per tool rather than reusing `reallocate_budget`'s dollar-based definition for `request_creative_refresh` too | The original single definition didn't apply to the second write tool and would have blocked implementing it |
 | Celery/Redis ownership | Hosted alongside the MCP server, not a separate or unowned component; the anomaly sweep reuses the MCP server's own tool-calling code path | Only the MCP server has a clean, already-built reason to read across all four services; this also unifies scheduled monitoring and on-demand investigation into one code path instead of two |
@@ -372,15 +373,14 @@ Each phase ended with the matching learning doc. This is a historical record of 
 | Build sequencing | Build a one-service, one-tool walking skeleton (OneSource360-sim + MCP server + Claude Code, end to end) before building out all four services | De-risks the genuinely novel part — the MCP/Claude Code integration — early, instead of discovering problems with it only after a long slog through repetitive service scaffolding |
 | API documentation | Added auto-generated OpenAPI docs per service plus the MCP server's `/tools` introspection endpoint | The pedagogical learning docs teach the system; this is the actual machine-readable reference — a distinction worth having, and cheap to add |
 | Testing | Explicit per-phase tests, with the heaviest coverage on the risk-scoring function specifically | The risk-scoring function is the safety-critical part of the system and deserves the most scrutiny |
-| Auth depth | JWT (users) + client-credentials token (service-to-service), no full OAuth2 provider | Real patterns, proportionate effort |
+| Auth depth | JWT (users) + client-credentials-style service token (MCP → each Django service) | Real patterns, proportionate effort for a local demo |
 | GraphQL | One join query across all 4 platforms, not a parallel full API | Shows judgment about when GraphQL earns its place |
-| Local-only | No cloud deployment | Not needed given zero-cost, local-first plan |
-| SmartSpot360 scoring | Deterministic weighted scoring over historical spot CPL | Sample-size confidence is what the guardrail needs; this is the recommendation logic, not a placeholder |
-| Scope | Closed at the current build; remaining work is polish | Stops feature creep once the pitch is demoable |
+| Local-only | Docker Compose on a laptop | Matches the zero paid-hosting constraint |
+| SmartSpot360 scoring | Deterministic weighted scoring over historical spot CPL | Sample-size confidence is what the guardrail needs |
+| Scope | Closed at the current build | Stops feature creep once the pitch is demoable |
 | Learning docs | Written per-phase alongside the code, not after | Keeps the docs accurate to what was actually built, and reinforces the material while it's still fresh |
 | Stakeholder documentation | Added `docs/for-marketers.md` as a separate track from the technical learning docs, not a simplified version of them | Translating a technical system for non-technical users is a distinct, real skill this project treats as first-class (§1), not a footnote |
 | UI for live table snapshots | Each Django service exposes `GET /api/inspect/`; the MCP server exposes `GET /catalog` + `GET /inspect`; Systems pages join them so a demo can point at the exact table, endpoint, and handler | The console is the only surface being demoed; the agent path has to be visible there, not only in logs |
-| Repo naming | Product name is **Agent360**; the GitHub remote stays **agentic-demo** unless/until renamed | The two are independent — the local folder name doesn't need to match |
-| License | None | Public demo/learning repo; not offered under an open-source license by default |
+| Repo naming | Product name is **Agent360**; the GitHub remote is **agentic-demo** | The two are independent — the local folder name doesn't need to match |
 | Git workflow | Explicit review before commit/push | Full control over what reaches a public repo and when |
 | Build workflow | Tier 1 built with minimal check-ins, followed by a full walkthrough once it's working | Prioritizes momentum through the core build; the learning happens in the walkthrough and the docs, not step-by-step narration |

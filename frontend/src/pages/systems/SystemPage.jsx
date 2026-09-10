@@ -242,23 +242,24 @@ const SystemPage = () => {
           <code>GET {platform.inspect_path}</code>
           . This is the data an MCP tool reads — not a chart, the rows.
         </Typography>
-        {error && snapshot ? (
+        {error ? (
           <Typography sx={{ color: "#B42318", fontSize: 13, mb: 1 }}>{error}</Typography>
         ) : null}
-        {!snapshot ? (
+        {!snapshot && !error ? (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, color: "text.secondary" }}>
             <CircularProgress size={16} /> Loading tables…
           </Box>
-        ) : (
-          (snapshot.tables || []).map((table) => (
-            <SnapshotTable
-              key={table.db_table}
-              table={{ ...table, database: snapshot.database }}
-              purpose={purposeByTable[table.db_table]}
-              onPage={(offset) => pageTable(table.db_table, offset)}
-            />
-          ))
-        )}
+        ) : null}
+        {snapshot
+          ? (snapshot.tables || []).map((table) => (
+              <SnapshotTable
+                key={table.db_table}
+                table={{ ...table, database: snapshot.database }}
+                purpose={purposeByTable[table.db_table]}
+                onPage={(offset) => pageTable(table.db_table, offset)}
+              />
+            ))
+          : null}
       </Collapsible>
 
       <Collapsible

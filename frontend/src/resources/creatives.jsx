@@ -68,7 +68,7 @@ export const CreativeList = () => (
       color="#166534"
       platform="Captivator360"
       role="ad creative performance"
-      summary="Each row is one ad — the actual 30-second spot people see. Click a row to see click-through rate versus this ad's own first week."
+      summary="Status shows whether the ad is still running; CTR vs launch flags any ad whose click-through rate has slipped from its own first week."
       terms={[
         { term: "Creative", def: "The ad itself. CR-114 is a version name, like “v3 of the Medicare TV spot.”" },
         { term: "Impressions", def: "How many times the ad was shown that day." },

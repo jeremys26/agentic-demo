@@ -6,6 +6,10 @@ This is a **local demo and learning project**, modeled on BMG360’s publicly do
 
 **Not affiliated with BMG360.** Data models are inferred from public descriptions and industry-standard martech patterns — not from any non-public knowledge of their systems.
 
+![One investigation, three risk-scored outcomes — auto-executed, pending approval, and blocked, each logged with its reasoning](docs/assets/field-notes/06-agent-actions-three-tiers.jpg)
+
+*One real investigation, three outcomes: a small reallocation auto-executed, a larger one queued for human approval, a creative refresh blocked outright — all scored by the same deterministic guardrail. See [`docs/field-notes.md`](docs/field-notes.md) for the full walkthrough.*
+
 ## Quick start
 
 ```bash
@@ -109,7 +113,7 @@ services/maestro360/       Django — call routing
 services/rankpulse_sim/    FastAPI — fifth-platform onboarding demo (unregistered by default)
 mcp_server/                FastAPI + MCP SDK — tool registry, guardrails, Celery anomaly sweep
 frontend/                  React-Admin console
-docs/                      Learning notes, marketer guide, demo script
+docs/                      Learning notes, marketer guide, demo walkthrough & field notes
 ```
 
 ## Docs
@@ -118,5 +122,5 @@ docs/                      Learning notes, marketer guide, demo script
 |---|---|
 | [`docs/for-marketers.md`](docs/for-marketers.md) | Non-technical users of the approval queue |
 | [`LEARNING.md`](LEARNING.md) | Index of technical topic docs |
-| [`docs/demo-script.md`](docs/demo-script.md) | Live walkthrough for stakeholders |
+| [`docs/field-notes.md`](docs/field-notes.md) | Live demo walkthrough for stakeholders, illustrated with a real run |
 | [`PLANNING.md`](PLANNING.md) | Full design rationale and decisions log |

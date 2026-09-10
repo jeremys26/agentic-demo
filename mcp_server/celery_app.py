@@ -32,4 +32,4 @@ celery_app.conf.beat_schedule = {
     },
 }
 
-import tasks  # noqa: E402, F401 — registers sweep_for_anomalies + simulate_next_day
+import tasks  # noqa: E402, F401 — registers sweep_for_anomalies

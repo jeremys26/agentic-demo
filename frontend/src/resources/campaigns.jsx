@@ -77,7 +77,7 @@ export const CampaignList = () => (
       color="#0A21C7"
       platform="OneSource360"
       role="performance warehouse"
-      summary="Each row is one advertising campaign. Click a row to see the daily scoreboard — that's where spend, leads, and cost-per-lead actually live."
+      summary="Status shows whether the campaign is still active; Performance flags any campaign trending over its cost-per-lead target."
       terms={[
         { term: "Campaign", def: "A named advertising effort. “Medicare Advantage – Southeast TV” means: sell Medicare plans, in the Southeast, by buying TV ads." },
         { term: "Spend", def: "Dollars paid to run ads that day. Not profit — just the media bill." },

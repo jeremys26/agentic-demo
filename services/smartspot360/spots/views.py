@@ -1,5 +1,5 @@
 from collections import defaultdict
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -86,7 +86,10 @@ def recommend_budget(request):
     if campaign_id is None or budget_amount is None:
         return Response({"error": "campaign_id and budget_amount are required"}, status=400)
 
-    budget_amount = Decimal(str(budget_amount))
+    try:
+        budget_amount = Decimal(str(budget_amount))
+    except InvalidOperation:
+        return Response({"error": "budget_amount must be a number"}, status=400)
 
     performances = SpotPerformance.objects.filter(
         spot__campaign_id=campaign_id, cpl__isnull=False
@@ -114,6 +117,10 @@ def recommend_budget(request):
     total_samples = 0
     for (station_id, daypart_id), perfs in groups.items():
         avg_cpl = sum(p.cpl for p in perfs) / len(perfs)
+        # A zero (or negative, from bad data) CPL can't be weighted by 1/avg_cpl
+        # below — exclude rather than divide by zero.
+        if avg_cpl <= 0:
+            continue
         sample_size = len(perfs)
         total_samples += sample_size
         stats.append(
@@ -126,6 +133,19 @@ def recommend_budget(request):
                 "sample_size": sample_size,
             }
         )
+
+    if not stats:
+        recommendation = BudgetRecommendation.objects.create(
+            campaign_id=campaign_id,
+            budget_amount=budget_amount,
+            allocation=[],
+            rationale=(
+                "No historical spot performance data with a usable cost-per-lead exists yet "
+                "for this campaign, so there isn't enough information to recommend an allocation."
+            ),
+            confidence=Decimal("0.000"),
+        )
+        return Response(BudgetRecommendationSerializer(recommendation).data)
 
     stats.sort(key=lambda s: s["avg_cpl"])
 

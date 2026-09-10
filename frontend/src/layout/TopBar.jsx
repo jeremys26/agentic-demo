@@ -127,6 +127,7 @@ const TopBar = () => (
         sx={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "flex-end",
           gap: 0.5,
           overflowX: "auto",
           minWidth: 0,

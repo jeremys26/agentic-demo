@@ -22,16 +22,28 @@ function paginate(records, pagination) {
   return records.slice(start, start + perPage);
 }
 
+// DRF's DecimalField serializes as a JSON string (e.g. target_cpl: "45.00"),
+// so a plain `<`/`>` comparison sorts numeric columns lexicographically
+// ("9.00" > "45.00"). Compare numerically whenever both values parse as
+// numbers; fall back to string comparison for genuinely non-numeric fields.
+function compareValues(a, b) {
+  const na = typeof a === "number" ? a : Number(a);
+  const nb = typeof b === "number" ? b : Number(b);
+  const bothNumeric = a !== "" && b !== "" && a != null && b != null && !Number.isNaN(na) && !Number.isNaN(nb);
+  if (bothNumeric) return na - nb;
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
 function sortRecords(records, sort) {
   if (!sort || !sort.field) return records;
   const { field, order } = sort;
   const dir = order === "DESC" ? -1 : 1;
   return [...records].sort((a, b) => {
-    if (a[field] < b[field]) return -1 * dir;
-    if (a[field] > b[field]) return 1 * dir;
-    if (a.id < b.id) return -1;
-    if (a.id > b.id) return 1;
-    return 0;
+    const cmp = compareValues(a[field], b[field]);
+    if (cmp !== 0) return cmp * dir;
+    return a.id - b.id;
   });
 }
 

@@ -4,13 +4,13 @@
 
 ## What it is
 
-Django is a Python web framework. A **project** is the overall configuration — settings, URL routing, WSGI entrypoint. An **app** is a self-contained bundle of functionality (models, views, admin config) that lives inside a project; a project can hold several apps. Django's **ORM** (Object-Relational Mapper) lets you define database tables as Python classes (`models.py`) instead of writing SQL directly, and **migrations** are auto-generated, version-controlled files that translate changes to those classes into actual database schema changes.
+Django is a Python web framework. A **project** is the overall configuration — settings, URL routing, WSGI entrypoint. An **app** is a self-contained bundle of functionality (models, views, admin config) that lives inside a project; a project can hold several apps. Django's **ORM** (Object-Relational Mapper) lets you define database tables as Python classes (`models.py`) instead of writing SQL directly. **Migrations** are auto-generated, version-controlled files that turn changes to those classes into actual database schema changes.
 
 ## Why this piece of the stack is used here
 
 Django + its ORM is the backbone of every "sim platform" service in Agent360 (`PLANNING.md` §6) — a fast way to get a real, migration-backed Postgres schema and a browsable admin UI without hand-rolling either.
 
-**Why four separate Django projects instead of one project with four apps**: Agent360's whole pitch is "these systems didn't originally talk to each other, and Agent360 is the thing that connects them." If all four platforms lived as apps inside one Django project sharing one settings file and one database, that claim wouldn't survive scrutiny — it would just be one app with internal modules importing each other directly. Running `django-admin startproject` four separate times, each with its own `manage.py`, `settings.py`, and (per `docker-compose.yml`) its own Postgres database, makes the "independent systems, connected over HTTP only" claim literally true. See `PLANNING.md` §5.
+**Why four separate Django projects instead of one project with four apps**: Agent360's pitch is that these systems didn't originally talk to each other, and Agent360 is what connects them. If all four platforms lived as apps inside one Django project sharing one settings file and one database, that claim wouldn't survive scrutiny — it would just be one app with internal modules importing each other directly. Running `django-admin startproject` four separate times, each with its own `manage.py`, `settings.py`, and (per `docker-compose.yml`) its own Postgres database, makes "independent systems, connected over HTTP only" literally true. See `PLANNING.md` §5.
 
 RankPulse-sim (`services/rankpulse_sim`) is deliberately *not* Django — it's a one-file FastAPI stand-in for a newly-acquired platform that brought its own stack. That's the point of the fifth-platform demo, not a fifth copy of this pattern.
 
