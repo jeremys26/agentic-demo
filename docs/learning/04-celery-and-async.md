@@ -1,35 +1,120 @@
 # 04 — Celery and Async
 
-**Status**: complete. The deterministic anomaly sweep from `PLANNING.md` §8 is built and live-verified.
+**Status**: complete. The deterministic anomaly sweep from `PLANNING.md` §8 is built and live-verified. Related: webhooks / Simulate Next Day in `13-webhooks-and-simulation.md`.
 
 ## What it is
 
-Celery is a task queue: a way to run a function outside the request/response cycle, either "soon" (a background job triggered by something happening) or "on a schedule" (a periodic job, no trigger needed). It needs a **broker** — somewhere to put "run this task" messages so a separate worker process can pick them up — which here is **Redis**, used purely as a message queue, not for its caching features. **Celery beat** is a separate scheduler process that does nothing but wake up periodically and enqueue tasks; it never runs task code itself, which is why this repo runs it as its own container (`celery_beat`) distinct from the worker that actually executes tasks (`celery_worker`).
+Celery is a **distributed task queue** for Python. It lets you run a function *outside* the HTTP request/response cycle — either soon after something happens, or on a schedule. Three moving parts:
+
+| Piece | Job |
+|---|---|
+| **Broker** | Holds "please run this task" messages. Here: **Redis** (used as a queue, not a cache). |
+| **Worker** | Process that pulls messages and executes task code (`celery_worker` container). |
+| **Beat** | Scheduler that only *enqueues* periodic tasks on a timer (`celery_beat` container). Beat never runs task bodies. |
+
+Why two containers for worker vs. beat? So a crash or deploy of one doesn't take down the other, and so you can scale workers independently. Compose mirrors that split even for a laptop demo.
 
 ## Why this piece of the stack is used here
 
-`PLANNING.md` §8 calls for a way to auto-flag campaigns with anomalous CPL **without an LLM in the loop** — pure SQL/math, running on a timer instead of waiting for a human or an agent to happen to look. That's exactly Celery's job: periodic, deterministic, unattended work. The key design decision (`PLANNING.md`'s Decisions Log) was **where** this lives — not a separate, unowned service, but hosted alongside the MCP server and reusing its own code, since the MCP server is the only component with a clean, already-built reason to read across all four sim services. Concretely, that means the exact same function `tools/onesource360.py`'s `get_performance_anomalies()` — the one a live agent conversation would call — is what the scheduled sweep calls too. **Scheduled monitoring and agent-driven investigation are the same code path, just triggered differently: a timer instead of a conversation.**
+`PLANNING.md` §8 needs campaigns with anomalous CPL flagged **without an LLM in the loop** — pure SQL/math on a timer. Celery is the standard Django/Python answer for that.
+
+**Where it lives matters as much as that it exists.** The Decisions Log put Celery alongside the MCP server, reusing the gateway's own code, because only the gateway already has a clean reason to read across all four sim services. Concretely: the scheduled sweep calls the same `get_performance_anomalies()` function a live agent conversation would call — the raw Python function in `tools/onesource360.py`, not the MCP-wrapped handler (wrapping would falsely log a sweep as an agent tool call).
+
+> **Scheduled monitoring and agent-driven investigation are the same code path — a timer instead of a conversation.**
 
 ## Where it lives in this repo
 
-- `mcp_server/celery_app.py` — defines the `Celery` app (`agent360`), pointed at Redis as both broker and result backend (`REDIS_URL`, default `redis://redis:6379/0`), and the `beat_schedule` dict: one entry, `sweep-for-anomalies`, firing every `ANOMALY_SWEEP_INTERVAL_SECONDS` (default 300 = 5 minutes). Imports `tasks` at the bottom of the file — the standard Celery multi-file layout: the app module imports the tasks module so task registration happens as an import side effect, and the tasks module imports the app back (`from celery_app import celery_app`) to decorate its functions with `@celery_app.task`. This looks circular but isn't a problem in practice. By the time `tasks.py` runs `from celery_app import celery_app`, the `celery_app` variable already exists in the partially-loaded `celery_app` module — it's assigned before the `import tasks` line — so Python's module cache resolves it fine.
-- `mcp_server/tasks.py` — `sweep_for_anomalies()`, the scheduled Celery beat task. Since Celery tasks are plain sync functions but the helpers they wrap are async, the task body is `asyncio.run(...)` — a small, deliberate sync/async boundary rather than trying to run Celery itself in async mode.
-- `mcp_server/guardrails/engine.py`'s `run_anomaly_sweep()` — the actual logic, callable from three places identically: the Celery task, a manual `POST /flagged-campaigns/sweep` (for demoing on-demand rather than waiting for the next tick), and once automatically at MCP server startup (`main.py`'s `lifespan`, so the Flagged Campaigns log has real data immediately rather than waiting up to 5 minutes for the first beat tick). That same lifespan first calls `reset_audit_tables()` (`guardrails/db.py`) so prior demo runs don't leave stale Agent Actions / Tool Calls / flagged rows; the startup sweep then re-flags campaign 1. It calls `tools.onesource360.get_performance_anomalies()` directly — the raw function, not the `wrap_read_tool`-wrapped MCP handler — since a scheduled sweep isn't an agent tool call and logging it to `AgentToolCall` as one would misrepresent the trace. Each anomaly found is checked against `FlaggedCampaign` (`guardrails/models.py`) by `(campaign_id, variance_pct)` before inserting, so re-running against unchanged seed data — still the common case unless someone clicks Advance one day — doesn't pile up duplicate rows every tick.
-- `docker-compose.yml` — three additions: `redis` (image `redis:7-alpine`, host port 6380 to avoid clashing with any local Redis on 6379), `celery_worker` (runs `celery -A celery_app worker`, needs the full sim-service URLs and MCP DB credentials since it's what actually executes `run_anomaly_sweep()`), and `celery_beat` (runs `celery -A celery_app beat`, needs only `REDIS_URL` and `ANOMALY_SWEEP_INTERVAL_SECONDS` since it never touches the sim services or the DB itself — it just enqueues on a timer).
-- `mcp_server/main.py` — lifespan: `init_db` → `reset_audit_tables` → startup sweep; then `GET /flagged-campaigns` (the sweep's audit log, most recent first) and `POST /flagged-campaigns/sweep` (manual trigger). `POST /simulate-next-day` is the live event feed: it posts webhook payloads to each sim service (`mcp_server/simulator.py`) and then calls the same sweep.
-- `frontend/src/pages/Overview.jsx` — "Automated Anomaly Sweep" plus "Simulate Next Day" (`Advance one day`), so both the timer-driven detection story and the live-ingestion story are demonstrable on demand.
+### `mcp_server/celery_app.py`
 
-## A subtlety worth understanding: two flagging mechanisms, on purpose
+Defines the Celery app (`agent360`), points it at Redis (`REDIS_URL`, default `redis://redis:6379/0`) as both broker and result backend, and declares `beat_schedule`:
 
-The Campaigns list and the Overview's stat tiles still compute "flagged" **client-side**, live, on every page load (`dataProvider.js`'s `windowedCplVariance`) — that logic was built with the frontend, works well, and needs no sweep to have run recently. The Celery sweep is **additive**, not a replacement: a real, persisted, automated backend process (the Tier 2 ask — "instead of flagging manually"), surfaced in its own "Automated Anomaly Sweep" section as an audit trail with real timestamps, rather than silently replacing the tile logic the rest of the frontend already depends on. Both run the identical trailing-window CPL math, so as long as the underlying seed data hasn't changed, the client-side numbers and the sweep's log always agree in this demo. The reason to keep both is resilience and provenance, not disagreement — proving there's a real system-of-record making the detection, not just a page doing arithmetic when someone happens to look.
+- one entry: `sweep-for-anomalies`
+- every `ANOMALY_SWEEP_INTERVAL_SECONDS` (default **300** = 5 minutes)
+
+Standard multi-file layout: `celery_app.py` imports `tasks` at the bottom so `@celery_app.task` registration happens as an import side effect; `tasks.py` imports `celery_app` back. That looks circular but works — by the time `tasks` runs `from celery_app import celery_app`, the app object already exists in the partially loaded module.
+
+### `mcp_server/tasks.py`
+
+`sweep_for_anomalies()` is a sync Celery task wrapping async helpers via `asyncio.run(...)`. Celery's default worker model is synchronous; the MCP/httpx/SQLAlchemy stack is async. Bridging with `asyncio.run` is a deliberate, small boundary — cleaner here than running Celery in async mode for one task.
+
+### `mcp_server/guardrails/engine.py` → `run_anomaly_sweep()`
+
+The real logic, callable from **three** places identically:
+
+1. Celery beat → worker (periodic)
+2. `POST /flagged-campaigns/sweep` (manual / Overview button)
+3. MCP server lifespan on startup (so flagged data exists immediately, not after ≤5 minutes)
+
+Startup lifespan order in `main.py`: `init_db` → `reset_audit_tables` → `run_anomaly_sweep`. Restarting `mcp_server` therefore clears Agent Actions / Tool Calls and re-flags campaign 1 — demo prep in one command.
+
+The sweep:
+
+1. Calls `tools.onesource360.get_performance_anomalies()` directly
+2. For each anomaly, checks `FlaggedCampaign` for an existing `(campaign_id, variance_pct)` row
+3. Inserts only if new — **idempotent** against unchanged seed data (the common case until someone clicks Advance one day)
+
+### Compose services
+
+| Service | Command | Needs |
+|---|---|---|
+| `redis` | Redis 7 Alpine; host port **6380** → container 6379 | — |
+| `celery_worker` | `celery -A celery_app worker` | Redis + sim URLs + MCP DB creds + `SERVICE_TOKEN` (it runs the sweep) |
+| `celery_beat` | `celery -A celery_app beat` | Mostly Redis + interval env (enqueues only) |
+
+Worker waits for `mcp_server` healthy so the first tick doesn't hit a half-booted API.
+
+### Frontend
+
+`Overview.jsx` surfaces "Automated Anomaly Sweep" (log + "Run sweep now") and "Simulate Next Day" (which posts webhooks then re-runs the same sweep — `13`).
+
+## Two flagging mechanisms, on purpose
+
+| Mechanism | Where | Persistence |
+|---|---|---|
+| Client-side "flagged" | `dataProvider.js` `windowedCplVariance` on every Campaigns/Overview load | None — computed live |
+| Celery / startup / manual sweep | `FlaggedCampaign` rows in `mcp_server` DB | Persisted audit trail with timestamps |
+
+Both use the same trailing-window CPL math (>15% over target by default). They are **additive**: the sweep proves a real system-of-record is detecting anomalies, not only a page doing arithmetic when someone looks. Client-side tiles still work even if Redis/Celery were down.
+
+## Redis in this project (narrow role)
+
+Redis can be a cache, session store, pub/sub bus, or broker. Here it is **only a Celery broker/result backend**. No application code reads Redis for campaign data. If you see Redis in the architecture diagram, think "task queue," not "second database."
+
+## Sync vs async — mental model
+
+```text
+HTTP request (FastAPI)     → async handlers, await httpx, await SQLAlchemy
+Celery worker process      → sync task entrypoint → asyncio.run(async sweep)
+Claude Code tool call      → MCP async path → same get_performance_anomalies()
+```
+
+Three triggers, one detection function. That sameness is the design goal.
 
 ## Key vocabulary
 
-- **Broker** — where "run this task" messages queue up between whoever enqueues a task and whoever executes it. Redis here, used only as a queue.
-- **Worker** — the process that actually pulls tasks off the broker and runs their code (`celery_worker`).
-- **Beat** — the scheduler process that enqueues periodic tasks on a timer; never executes task code itself (`celery_beat`).
-- **Idempotent sweep** — re-running the same check against unchanged data shouldn't create duplicate records; enforced here by checking for an existing `FlaggedCampaign` row with the same `(campaign_id, variance_pct)` before inserting.
+- **Broker** — queue between enqueuer and worker. Redis here.
+- **Worker** — process that executes task code.
+- **Beat** — process that enqueues periodic tasks; never executes them.
+- **Idempotent sweep** — re-running against unchanged data doesn't create duplicate `FlaggedCampaign` rows.
+- **Result backend** — where Celery can store return values; configured to Redis here (handy for debugging, not critical to the demo UI).
+- **`asyncio.run`** — starts an event loop to drive async code from a sync context (the Celery task).
 
 ## Try this yourself
 
-`curl -X POST http://localhost:8100/flagged-campaigns/sweep` runs the sweep on demand — compare `docker compose logs celery_beat` (shows the scheduled tick firing every 5 minutes) against this manual call (identical result, different trigger). `docker compose logs celery_worker` shows the task actually executing and returning its result.
+```bash
+# On-demand (same code path as beat)
+curl -X POST http://localhost:8100/flagged-campaigns/sweep
+
+# See the scheduler tick
+docker compose logs -f celery_beat
+
+# See the worker execute
+docker compose logs -f celery_worker
+
+# List flagged rows the UI reads
+curl -s http://localhost:8100/flagged-campaigns | python -m json.tool
+```
+
+Compare a manual POST against a beat tick in the logs — identical result, different trigger.
+
+**Next:** `05-mcp-servers.md` for the gateway the sweep sits beside.

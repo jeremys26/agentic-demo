@@ -166,7 +166,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Tier 2 anomaly sweep (PLANNING.md §8): Celery worker + beat, hosted
+  # Anomaly sweep (PLANNING.md §8): Celery worker + beat, hosted
   # alongside the MCP server (same image, same guardrails/engine.py code),
   # not as a separate unowned component. beat only schedules; worker is what
   # actually calls run_anomaly_sweep(), so only worker needs the sim

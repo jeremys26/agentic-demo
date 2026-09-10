@@ -573,7 +573,7 @@ def _proposed_action_dict(p: ProposedAction) -> dict:
 
 async def run_anomaly_sweep(threshold_pct: float = 15.0, window_days: int = 7) -> dict:
     """
-    The Tier 2 anomaly sweep (PLANNING.md §8): reuses get_performance_anomalies'
+    The anomaly sweep (PLANNING.md §8): reuses get_performance_anomalies'
     own code path directly — no LLM, no MCP protocol round-trip, no cost —
     triggered by Celery beat on a timer instead of a conversation. Called
     with the module-level function directly (not the wrap_read_tool-wrapped

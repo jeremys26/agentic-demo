@@ -1,6 +1,6 @@
 // Custom data provider (PLANNING.md §10): the five backends don't share a
 // pagination/sort/filter convention (no json-server or simple-rest style
-// headers), and retrofitting one onto five services for a Tier 1 demo with
+// headers), and retrofitting one onto five services for a local demo with
 // a handful of records each isn't worth it — so this fetches each
 // resource's full list and paginates/sorts client-side instead. Reasonable
 // at this scale (6 campaigns, a handful of agent actions); would need
@@ -248,7 +248,7 @@ const FETCHERS = {
 
 function notSupported(method) {
   return async () => {
-    throw new Error(`${method} is not supported in Tier 1 — this frontend is read-only plus approve/reject`);
+    throw new Error(`${method} is not supported — this frontend is read-only plus approve/reject`);
   };
 }
 
@@ -284,7 +284,7 @@ export const dataProvider = {
   deleteMany: notSupported("deleteMany"),
 };
 
-// --- Tier 2 anomaly sweep (PLANNING.md §8) — not a react-admin resource,
+// --- Anomaly sweep (PLANNING.md §8) — not a react-admin resource,
 // just two direct calls the Overview page uses to show the automated,
 // LLM-free Celery sweep's own audit log alongside the frontend's own live
 // client-side flagging above. ---

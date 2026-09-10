@@ -58,7 +58,7 @@ def refresh_request(request, pk):
     """
     POST /api/creatives/{id}/refresh-request/ — {"reason": str}
 
-    Tier 1 plumbing only: creates the request as "pending". Whether it should
+    Creates the request as "pending". Whether it should
     actually happen is decided by the MCP server's risk-scoring guardrail
     (PLANNING.md §7), not by this endpoint.
 

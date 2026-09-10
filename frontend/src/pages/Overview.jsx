@@ -114,7 +114,7 @@ function timeAgo(iso) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-// Tier 2 anomaly sweep (PLANNING.md §8): a Celery beat schedule reuses
+// Anomaly sweep (PLANNING.md §8): a Celery beat schedule reuses
 // get_performance_anomalies' own code path on a timer, with no LLM in the
 // loop, and persists what it finds to FlaggedCampaign — this section reads
 // that log directly (fetchFlaggedCampaigns), distinct from the stat tiles

@@ -4,7 +4,7 @@ sim services, which know nothing about agents, approvals, or logging. Uses
 SQLAlchemy rather than Django since the MCP server is a FastAPI process, not
 a Django one; tables are created via metadata.create_all() at startup
 (db.py) rather than a full Alembic migration setup, proportionate to this
-being a Tier 1 demo rather than a production schema under active change.
+being a local demo rather than a production schema under active change.
 """
 
 import datetime
@@ -84,7 +84,7 @@ class ExecutedAction(Base):
 
 
 class FlaggedCampaign(Base):
-    """Persisted log of the Tier 2 Celery anomaly sweep (PLANNING.md §8).
+    """Persisted log of the Celery anomaly sweep (PLANNING.md §8).
     `run_anomaly_sweep()` writes a row when `get_performance_anomalies`
     flags a campaign; duplicates are skipped on (campaign_id, variance_pct)."""
 

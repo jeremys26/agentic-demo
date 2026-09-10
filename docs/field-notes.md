@@ -41,7 +41,9 @@ This walkthrough runs that whole loop live, on a real seeded scenario: a Medicar
 
 ## Before you start
 
-You need three things ready: the app running, its history wiped clean, and Claude Code connected to it.
+**First time on this machine?** Follow the full clone → Docker → Claude Code path in [`README.md` → Setup](../README.md#setup), then come back here for the walkthrough.
+
+For a live demo you need three things ready: the app running, its history wiped clean, and Claude Code connected to it.
 
 **1. Is everything running?**
 ```bash
@@ -465,7 +467,7 @@ Narrate from `docs/for-marketers.md` — it has exact numbers from a full prior 
 | Advance one simulated day | Overview page → **Advance one day**, or `curl -X POST http://localhost:8100/simulate-next-day` |
 | Connect Claude Code | `claude mcp add --transport http agent360 http://localhost:8100/mcp` |
 | Onboard RankPulse live | uncomment its import in `mcp_server/main.py` → rebuild `mcp_server` |
-| Run the test suite | `cd mcp_server && pytest` |
+| Run the test suite | `docker compose run --rm --no-deps mcp_server pytest` |
 | Fallback numbers, works offline | `docs/for-marketers.md` |
 
 ---

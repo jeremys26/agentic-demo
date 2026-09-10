@@ -143,7 +143,7 @@ async def tool_calls():
 @app.get("/flagged-campaigns")
 async def flagged_campaigns():
     """
-    The Tier 2 Celery anomaly sweep's own audit log (PLANNING.md §8) — every
+    The Celery anomaly sweep's own audit log (PLANNING.md §8) — every
     anomaly the automated, LLM-free sweep has ever detected and persisted,
     most recent first. Distinct from the frontend's own live client-side
     variance recompute on every page load (dataProvider.js), which is

@@ -1,54 +1,117 @@
 # 06 — Claude Code as Agent
 
-**Status**: complete. The seeded scenario has been run live against the MCP server with all three risk tiers firing on real data. The Cursor proof point is documented below (config verified; the headless CLI needs a one-time login under the demo operator’s Cursor account).
+**Status**: complete. The seeded scenario has been run live with all three risk tiers. Cursor is documented as a second client. Protocol substrate: `05-mcp-servers.md`.
 
 ## What it is
 
-`PLANNING.md` §5 is explicit about this: **there is no custom agent-orchestration code in this repo.** Claude Code already has a production-grade agent loop — it decides which tool to call, in what order, reads the result, and decides what to do next, all on its own. Connecting it to Agent360 is pure configuration: point it at a URL, and its existing MCP client handles the protocol handshake, tool discovery, and tool calling. The “agent” in “Agent360” is Claude Code itself; everything this repo builds is what Claude Code is allowed to *see and do* once connected, not how it thinks.
+An **agent** here means an LLM application that can *choose* which tools to call, read results, and decide what to do next — often in a loop — until it answers the user.
+
+`PLANNING.md` §5 is explicit: **there is no custom agent-orchestration code in this repo.** Claude Code already has a production-grade loop. Connecting it to Agent360 is configuration: point it at a URL; its MCP client handles handshake, discovery, and tool calling. The "agent" in Agent360 is Claude Code (or Cursor); this repo builds what the agent is allowed to *see and do*, not how it thinks.
 
 ## Why this piece of the stack is used here
 
-This is the answer to "what happens when you switch models or vendors" — nothing has to change, because governance lives at the tool layer (`guardrails/`), not the agent layer. Building a custom orchestration loop would have been wasted effort duplicating something Claude Code (and Cursor) already do well, and would have cost real API money to boot (`PLANNING.md`'s zero-cost constraint). It would also have hidden the actual differentiator — the risk-scoring guardrail — behind a pile of unremarkable "call an LLM, parse its response, decide what to do" plumbing that isn't specific to this project at all.
+Three reasons:
+
+1. **Zero orchestration to maintain** — no hand-rolled "call the model, parse tool_use, dispatch, repeat" service.
+2. **Zero paid API key for the core demo** — Claude Code / Cursor subscriptions already cover the agent runtime (`PLANNING.md` zero-cost constraint).
+3. **Governance stays portable** — policy lives in `guardrails/`, not in a system prompt or a vendor-specific agent framework. Switching clients proves that claim instead of asserting it.
+
+Building a custom loop would hide the real differentiator (risk scoring) behind unremarkable plumbing.
 
 ## Where it lives in this repo
 
-There's no application code for this doc to point at — that's the point. What exists instead:
+Almost nowhere as application code — that's the point:
 
-- `.cursor/mcp.json` (repo root) — Cursor's MCP client config, pointing at `http://localhost:8100/mcp`.
-- Claude Code's registration is a CLI command, not a repo file: `claude mcp add --transport http agent360 http://localhost:8100/mcp` (documented in `README.md`).
-- `mcp_server/main.py` mounts the actual protocol endpoint (`mcp.streamable_http_app()` at `/mcp`) that both clients hit.
+| Artifact | Role |
+|---|---|
+| Claude CLI registration | `claude mcp add --transport http agent360 http://localhost:8100/mcp` (not a repo file) |
+| `.cursor/mcp.json` | Cursor MCP config → same URL |
+| `mcp_server/main.py` | Mounts `mcp.streamable_http_app()` at `/mcp` |
 
 ## What actually happens on a tool call
 
-1. **Connect**: the client opens an HTTP connection to `/mcp` and performs the MCP handshake — `initialize`, then `notifications/initialized`.
-2. **Discover**: the client calls `tools/list`. The MCP Python SDK auto-generates each tool's JSON Schema from its Python function signature (see `05-mcp-servers.md`'s note on how `wrap_read_tool`'s wrapper still exposes the *original* signature via `functools.wraps`), so every tool the registry loop in `main.py` wired up appears with real, typed parameters — not a generic blob.
-3. **Reason**: the agent (Claude Code's own model) reads the available tools' names and descriptions and decides, based on the user's request, which to call and in what order. None of that reasoning is visible to or influenced by the MCP server — the server only sees discrete tool calls arrive.
-4. **Call**: each tool call is a `tools/call` request with a tool name and arguments. The server routes it to the matching Python function (read tools go through `wrap_read_tool`'s logging wrapper; write tools go through their own guardrail function, `guard_reallocate_budget` or `guard_request_creative_refresh`), executes it, and returns the result.
-5. **Repeat**: the agent reads the result and decides its next move — another tool call, or a final answer — entirely within its own loop. A multi-step investigation (list campaigns → check one system → check another → propose an action) is just several rounds of steps 3–4 back to back.
+```text
+User (plain language)
+  → Claude Code agent loop (model reasons)
+    → MCP client: initialize / tools/list (once per session)
+    → MCP client: tools/call { name, arguments }
+      → Agent360 gateway (log; if write → score → route)
+        → httpx → Django/FastAPI sim
+      ← JSON result
+    → model reads result, maybe another tools/call …
+  ← final answer to user
+```
 
-Every one of those `tools/call` requests lands in `AgentToolCall` (`guardrails/models.py`) identically, regardless of which client sent it. That table is what `frontend/src/resources/toolCalls.jsx`'s Tool Calls trace view reads from — effectively a live transcript of an agent's reasoning, made visible after the fact for free, without building any tracing infrastructure. It's just what logging every tool call already gives you.
+Step by step:
 
-## Worth knowing: MCP clients cache their tool list
+1. **Connect** — HTTP to `/mcp`; handshake `initialize` then `notifications/initialized`.
+2. **Discover** — `tools/list`. The Python MCP SDK builds JSON Schema from each handler's signature (including wrapped reads via `functools.wraps` — see `05`).
+3. **Reason** — entirely inside the client/model. The server never sees chain-of-thought; it only sees discrete tool calls.
+4. **Call** — `tools/call`. Reads go through `wrap_read_tool`; writes through `guard_reallocate_budget` / `guard_request_creative_refresh`.
+5. **Repeat** — multi-step investigation is several rounds of 3–4.
 
-An MCP client typically fetches `tools/list` once, when a session first connects — not on every tool call. If new tools are registered server-side after that (e.g. `mcp_server/main.py` gets rebuilt with an added `import tools.rankpulse`, as in the live fifth-platform onboarding demo in `05-mcp-servers.md`), a client whose session predates that change won't see the new tool until it reconnects. An existing, already-initialized session doesn't get an automatic push update.
+Every call lands in `AgentToolCall`. The Tool Calls resource in React-Admin is that table — a live transcript of what the agent checked, without separate tracing infrastructure.
 
-This happened during this project's own development: a Claude Code session connected since the walking-skeleton phase (when the registry held exactly one tool) kept surfacing only that one tool from its own tool search, long after the registry had grown to 11, because its cached tool list was never refreshed. The fix was to drive the MCP protocol directly with a small script — the Python `mcp` SDK's `streamable_http_client` + `ClientSession`, run from inside the `mcp_server` container, which already has the SDK installed — rather than trust the stale session. Same protocol, same server, just a different client: a small preview of the vendor-agnostic point below.
+## MCP clients cache their tool list
 
-**Practical implication for a live demo**: if you rebuild `mcp_server` mid-session to add a tool, start a fresh Claude Code session (or otherwise force a reconnect) afterward instead of continuing in the one that was already connected.
+Clients typically fetch `tools/list` **once per session**, not on every call. If you rebuild `mcp_server` mid-demo to uncomment RankPulse, an already-open Claude Code session may still show 11 tools until you start a **new session** (or otherwise force reconnect).
 
-## Tier 2: Cursor as a second, independent client
+This bit the project during development: a walking-skeleton session (1 tool) kept searching only that one tool after the registry grew to 11. Fix: new session, or drive the protocol with the SDK's `streamable_http_client` from inside the `mcp_server` container.
 
-`PLANNING.md` §8's vendor-agnostic proof calls for re-running the same investigation through **Cursor** — built by Anysphere, not Anthropic, so a genuinely independent implementation of the MCP client side, not just another Anthropic surface. This repo ships `.cursor/mcp.json` pointing at the identical `http://localhost:8100/mcp` URL Claude Code uses; opening Cursor and asking it to investigate campaign 1 exercises the exact same registry, guardrail, and logging code with zero server-side changes.
+**Demo rule:** after any registry change, new Claude Code session.
 
-Cursor also has a headless CLI, `cursor-agent`, which can run a prompt non-interactively (`cursor-agent -p --approve-mcps --trust "..."`, executed from the repo root so it picks up `.cursor/mcp.json`) — a scriptable version of the same proof, rather than a manual click-through. It requires its own one-time `cursor-agent login` first (a personal Cursor account; this repo does not and should not hold those credentials). What’s already confirmed: the CLI is installed, `.cursor/mcp.json` is correctly formed and points at a live, reachable server — the only remaining step for the automated proof is authentication under the operator’s account.
+## Claude Code vs Cursor (vendor-agnostic proof)
+
+| Client | Vendor | How it connects |
+|---|---|---|
+| Claude Code | Anthropic | `claude mcp add --transport http …` |
+| Cursor IDE | Anysphere | `.cursor/mcp.json` |
+| `cursor-agent` CLI | Anysphere | Headless; picks up `.cursor/mcp.json` from repo root; needs one-time `cursor-agent login` |
+
+Same server, same registry, same guardrail, same `AgentToolCall` rows. Nothing server-side branches on which client called. That is the portable-governance claim made tangible.
+
+Headless example shape (after login):
+
+```bash
+cursor-agent -p --approve-mcps --trust \
+  "Investigate campaign 1 — Medicare Advantage Southeast TV. Cost per lead spiked."
+```
+
+Credentials stay with the operator — never commit them.
+
+## What the agent is *not* responsible for
+
+| Concern | Owner |
+|---|---|
+| Which writes auto-execute | `policy.route` + scoring |
+| Approving pending actions | Human via REST / React-Admin |
+| Flagging CPL anomalies on a timer | Celery sweep (`04`) |
+| Cross-service joins in one query | GraphQL on the gateway (`12`) optional; agent can also multi-call REST tools |
+
+The agent investigates and proposes. The gateway governs. The human resolves medium-risk writes.
+
+## Prompting for the demo
+
+You do **not** need to name tools. Plain language works:
+
+> Investigate campaign 1 — Medicare Advantage Southeast TV. Cost per lead spiked. What happened, and what should we do?
+
+Approve Claude Code's own permission prompts when it wants to call Agent360 tools — the gateway never sees a call until the *client* allows it. Full stakeholder walkthrough: `docs/field-notes.md`.
 
 ## Key vocabulary
 
-- **MCP client** — the thing that connects to an MCP server and drives tool calls on an agent's behalf; Claude Code and Cursor are both clients of the *same* server here.
-- **Tool discovery** — the `tools/list` call a client makes once per session to learn what’s available; see the caching note above for why “once per session” matters.
-- **Handshake** — the `initialize` / `notifications/initialized` exchange that must happen before `tools/list` or `tools/call` will work; skipping straight to `tools/call` on a fresh connection produces a "missing session ID" error (mentioned in `05-mcp-servers.md`'s "try this yourself").
-- **Vendor-agnostic gateway** — the design property this whole doc demonstrates: governance and tool access live entirely server-side, so which LLM or vendor is asking is irrelevant to how a request gets handled.
+- **MCP client** — connects to an MCP server and drives tool calls (Claude Code, Cursor).
+- **Agent loop** — model ↔ tools until a final answer; implemented by the client, not this repo.
+- **Tool discovery** — `tools/list` once per session; see caching note.
+- **Handshake** — `initialize` / `notifications/initialized` before other MCP methods.
+- **Vendor-agnostic gateway** — governance and tools live server-side; client vendor is irrelevant to routing.
 
 ## Try this yourself
 
-Register the server with Claude Code (`claude mcp add --transport http agent360 http://localhost:8100/mcp`) and ask it, in plain language, to investigate campaign 1's cost-per-lead spike — no need to mention tool names, it'll figure out which ones to call. Then open Cursor with the same repo (or run `cursor-agent -p` after logging in) and ask the identical question — same answer, same underlying tool calls, same guardrail decisions, different client entirely.
+1. Stack up: `docker compose up --build`
+2. Register: `claude mcp add --transport http agent360 http://localhost:8100/mcp`
+3. New Claude Code session; ask the investigate question above
+4. Watch Tool Calls and Agent Actions at `http://localhost:3000`
+5. Optional: same question in Cursor
+
+**Next:** `07-auth-jwt-oauth2.md` for how the gateway authenticates to the sims on each of those HTTP calls.
